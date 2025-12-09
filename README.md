@@ -67,21 +67,9 @@ connectomes = load_all_connectomes(
 avg_connectome = compute_group_average(connectomes)
 ```
 
-### Main Analysis Notebooks
-
-- `scripts/notebooks/new_analysis.ipynb` - Main structural connectome analysis
-- `scripts/notebooks/dwi_preprocessing_qc.ipynb` - DWI preprocessing QC
-- `scripts/notebooks/qc_pattern_analysis.ipynb` - QC pattern analysis
-
-### Key Scripts
-
-- `scripts/regenerate_connectomes_430.py` - Regenerate connectomes with 430-parcel atlas
-- `scripts/sizecorr.py` - Size correction for connectomes
-- `scripts/snr_voxelwise_qc.py` - SNR voxelwise QC analysis
-
 ## Atlas Information
 
-- **Total ROIs**: 430 (after removing parcels 390 and 423)
+- **Total ROIs**: 430  
 - **Cortical**: Parcels 1-360 (Yeo7 networks)
 - **Subcortical**: Parcels 361-424
 - **Brainstem**: Parcels 425-428
@@ -100,13 +88,6 @@ Preproc_current/
 │       └── sub-XX_MEAN_MD.csv
 ```
 
-## Features
-
-- **Connectome Loading**: Automatic caching for efficient data loading
-- **Group Analysis**: Built-in functions for group comparisons
-- **Visualization**: Custom plotting functions for connectomes
-- **QC Tools**: SNR and preprocessing quality control
-- **Statistical Analysis**: Connectivity strength, efficiency, and similarity metrics
 
 ## Configuration
 
@@ -116,24 +97,4 @@ Key configuration is in `scripts/utils/connectome_utils.py`:
 - `PREPROC_DIR`: Preprocessing directory
 - `ATLAS_DIR`: Atlas files directory
 - `N_ROIS`: Number of ROIs (430)
-
-## Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Test with sample data
-4. Submit a pull request
-
-## License
-
-[Add your license here]
-
-## Citation
-
-If you use this code, please cite:
-[Add citation information]
-
-## Contact
-
-[Add contact information]
 
