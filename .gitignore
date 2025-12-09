@@ -1,0 +1,105 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv
+venv/
+ENV/
+env/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data directories (too large for git)
+Preproc_current/
+rawdata_current/
+normalized/
+_dcm2niix_tmp/
+_backup_*/
+
+# Large atlas files (keep only small metadata files)
+atlas/*.nii.gz
+atlas/*.mif
+atlas/HCPex_folder/
+atlas/mni_icbm152_nlin_asym_09a/
+atlas/mni_icbm152_nlin_asym_09c/
+atlas/new_template/
+atlas/registration_*/
+atlas/subcort_brainstem/
+atlas/Yeo_JNeurophysiol11_MNI152/
+
+# Results and outputs
+Preproc_current/results/*.png
+Preproc_current/results/*.pdf
+Preproc_current/*.png
+Preproc_current/*.pdf
+
+# Logs
+*.log
+logs/
+scripts/logs/
+
+# Third-party tools (keep only if you've modified them)
+# Uncomment if you want to exclude these:
+# dcm2niix/
+# SDI/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Large CSV files (connectomes)
+*.csv
+!atlas/*.csv  # Keep atlas mapping CSVs
+!scripts/**/*.csv  # Keep small CSV files in scripts
+
+# Excel files (keep only if small)
+*.xlsx
+!atlas/parcels_label.xlsx  # Keep this one
+
+# Cache files
+.cache/
+*.cache
+
