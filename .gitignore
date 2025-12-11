@@ -110,4 +110,7 @@ atlas/*.csv
 *.cache
 
 SDI/GSP_StructuralDecouplingIndex/
-
+test_dcm2niix/
+normalized:
+preprocessing_log.txt
+.jupyter
