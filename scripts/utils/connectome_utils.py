@@ -17,6 +17,7 @@ from itertools import combinations
 import glob
 import json
 import warnings
+import random
 warnings.filterwarnings('ignore')
 import matplotlib as mpl
 
@@ -3470,6 +3471,448 @@ def run_full_efficiency_analysis(
             'metrics': metrics_save_path
         }
     }
+
+
+# ============================================================================
+# BOOTSTRAP ANALYSIS FUNCTIONS
+# ============================================================================
+
+def bootstrap_global_network_metrics(
+    connectomes_dict: Dict[str, np.ndarray],
+    groups: Dict[str, List[str]],
+    metric_type: str = 'connectivity_strength',
+    n_bootstrap: int = 5000,
+    confidence_level: float = 0.95,
+    random_seed: Optional[int] = None,
+    region_type: str = 'whole_brain',
+    target_density: Optional[float] = None,
+    use_bct: bool = False,
+    parcel_to_yeo7: Optional[Dict[int, int]] = None,
+    subcort_df: Optional[pd.DataFrame] = None,
+    parcel_to_category: Optional[Dict[int, str]] = None,
+    verbose: bool = True
+) -> Dict:
+    """
+    Perform stratified bootstrap resampling to compute confidence intervals for global network metrics.
+    
+    This function resamples subjects within each group (stratified bootstrap) and recomputes
+    metrics B times to estimate uncertainty. Particularly useful for small sample sizes (e.g., n=5).
+    
+    Parameters:
+    -----------
+    connectomes_dict : dict
+        Dictionary of connectomes (from load_all_connectomes()), keys are subject IDs with 'sub-' prefix
+    groups : dict
+        Dictionary mapping group names to subject lists (without 'sub-' prefix)
+    metric_type : str
+        Type of metrics to compute: 'connectivity_strength' or 'efficiency_pathlength'
+    n_bootstrap : int
+        Number of bootstrap iterations (default: 5000)
+    confidence_level : float
+        Confidence level for intervals (default: 0.95 for 95% CI)
+    random_seed : int, optional
+        Random seed for reproducibility
+    region_type : str
+        'whole_brain' or 'subcortical'
+    target_density : float, optional
+        Target density for thresholding (for efficiency_pathlength only)
+    use_bct : bool
+        If True, use bctpy; otherwise use NetworkX (for efficiency_pathlength only)
+    parcel_to_yeo7 : dict, optional
+        Mapping dictionary from parcel_id (1-430) to Yeo7 network ID (for whole-brain only)
+    subcort_df : pd.DataFrame, optional
+        DataFrame with subcortical parcel info (for subcortical only)
+    parcel_to_category : dict, optional
+        Mapping from parcel_id to subcortical category (for subcortical only)
+    verbose : bool
+        Whether to print progress
+    
+    Returns:
+    --------
+    bootstrap_results : dict
+        Dictionary containing:
+        - 'bootstrap_distributions': dict of metric_name -> list of bootstrap values
+        - 'group_means': dict of metric_name -> dict of group_name -> mean value
+        - 'group_cis': dict of metric_name -> dict of group_name -> (lower, upper) CI
+        - 'group_differences': dict of comparison -> dict of metric_name -> (mean_diff, ci_lower, ci_upper, p_value)
+        - 'sign_flips': dict of comparison -> dict of metric_name -> proportion of sign flips
+        - 'n_bootstrap': number of bootstrap iterations
+        - 'confidence_level': confidence level used
+    """
+    if random_seed is not None:
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+    
+    # Prepare groups: filter subjects that exist in connectomes_dict
+    valid_groups = {}
+    for group_name, group_subjects in groups.items():
+        valid_subjects = []
+        for subj in group_subjects:
+            subj_key = f'sub-{subj}' if not subj.startswith('sub-') else subj
+            if subj_key in connectomes_dict:
+                valid_subjects.append(subj)
+        if len(valid_subjects) > 0:
+            valid_groups[group_name] = valid_subjects
+    
+    if len(valid_groups) < 2:
+        raise ValueError("Need at least 2 groups with valid subjects for bootstrap analysis")
+    
+    if verbose:
+        print("="*80)
+        print(f"BOOTSTRAP ANALYSIS: {metric_type.upper()} ({region_type})")
+        print("="*80)
+        print(f"Groups: {list(valid_groups.keys())}")
+        for group_name, subjects in valid_groups.items():
+            print(f"  {group_name}: {len(subjects)} subjects")
+        print(f"Bootstrap iterations: {n_bootstrap}")
+        print(f"Confidence level: {confidence_level*100}%")
+        print()
+    
+    # Initialize storage for bootstrap distributions
+    bootstrap_distributions = {}
+    all_metric_names = None
+    
+    # Run bootstrap iterations
+    if verbose:
+        print("Running bootstrap iterations...")
+        print_progress_every = max(1, n_bootstrap // 20)  # Print every 5%
+    
+    for b in range(n_bootstrap):
+        # Resample subjects within each group (stratified bootstrap)
+        resampled_groups = {}
+        for group_name, subjects in valid_groups.items():
+            # Sample with replacement, maintaining group size
+            resampled_subjects = random.choices(subjects, k=len(subjects))
+            resampled_groups[group_name] = resampled_subjects
+        
+        # Create resampled connectomes_dict
+        resampled_connectomes = {}
+        for group_name, resampled_subjects in resampled_groups.items():
+            for subj in resampled_subjects:
+                subj_key = f'sub-{subj}' if not subj.startswith('sub-') else subj
+                if subj_key in connectomes_dict:
+                    # Use original connectome (resampling is at subject level, not connectome level)
+                    resampled_connectomes[subj_key] = connectomes_dict[subj_key]
+        
+        # Compute metrics for this bootstrap sample
+        if metric_type == 'connectivity_strength':
+            metrics_df = compute_connectivity_strength_metrics(
+                connectomes_dict=resampled_connectomes,
+                groups=resampled_groups,
+                region_type=region_type,
+                parcel_to_yeo7=parcel_to_yeo7,
+                subcort_df=subcort_df,
+                parcel_to_category=parcel_to_category
+            )
+        elif metric_type == 'efficiency_pathlength':
+            metrics_df = compute_efficiency_pathlength_metrics(
+                connectomes_dict=resampled_connectomes,
+                groups=resampled_groups,
+                region_type=region_type,
+                target_density=target_density,
+                use_bct=use_bct,
+                parcel_to_yeo7=parcel_to_yeo7,
+                parcel_to_category=parcel_to_category
+            )
+        else:
+            raise ValueError(f"Unknown metric_type: {metric_type}. Must be 'connectivity_strength' or 'efficiency_pathlength'")
+        
+        if len(metrics_df) == 0:
+            continue
+        
+        # Store metric names from first iteration
+        if all_metric_names is None:
+            # Exclude subject and group columns
+            all_metric_names = [col for col in metrics_df.columns 
+                              if col not in ['subject', 'group']]
+        
+        # Compute group means for this bootstrap iteration
+        for metric_name in all_metric_names:
+            if metric_name not in bootstrap_distributions:
+                bootstrap_distributions[metric_name] = {}
+            
+            for group_name in valid_groups.keys():
+                group_data = metrics_df[metrics_df['group'] == group_name][metric_name].dropna()
+                if len(group_data) > 0:
+                    group_mean = group_data.mean()
+                    if group_name not in bootstrap_distributions[metric_name]:
+                        bootstrap_distributions[metric_name][group_name] = []
+                    bootstrap_distributions[metric_name][group_name].append(group_mean)
+        
+        if verbose and (b + 1) % print_progress_every == 0:
+            print(f"  Completed {b + 1}/{n_bootstrap} iterations ({(b+1)/n_bootstrap*100:.1f}%)")
+    
+    if verbose:
+        print(f"✓ Completed all {n_bootstrap} bootstrap iterations\n")
+    
+    # Compute confidence intervals and summary statistics
+    alpha = 1 - confidence_level
+    lower_percentile = (alpha / 2) * 100
+    upper_percentile = (1 - alpha / 2) * 100
+    
+    group_means = {}
+    group_cis = {}
+    
+    for metric_name in all_metric_names:
+        group_means[metric_name] = {}
+        group_cis[metric_name] = {}
+        
+        for group_name in valid_groups.keys():
+            if group_name in bootstrap_distributions[metric_name]:
+                values = np.array(bootstrap_distributions[metric_name][group_name])
+                group_means[metric_name][group_name] = np.mean(values)
+                ci_lower = np.percentile(values, lower_percentile)
+                ci_upper = np.percentile(values, upper_percentile)
+                group_cis[metric_name][group_name] = (ci_lower, ci_upper)
+    
+    # Compute group differences and empirical p-values
+    group_names_list = list(valid_groups.keys())
+    group_differences = {}
+    sign_flips = {}
+    
+    for i, group1 in enumerate(group_names_list):
+        for group2 in group_names_list[i+1:]:
+            comparison = f"{group1}_vs_{group2}"
+            group_differences[comparison] = {}
+            sign_flips[comparison] = {}
+            
+            for metric_name in all_metric_names:
+                if (group1 in bootstrap_distributions[metric_name] and 
+                    group2 in bootstrap_distributions[metric_name]):
+                    
+                    values1 = np.array(bootstrap_distributions[metric_name][group1])
+                    values2 = np.array(bootstrap_distributions[metric_name][group2])
+                    
+                    # Compute differences
+                    differences = values1 - values2
+                    mean_diff = np.mean(differences)
+                    ci_lower = np.percentile(differences, lower_percentile)
+                    ci_upper = np.percentile(differences, upper_percentile)
+                    
+                    # Empirical p-value: proportion of differences that cross zero
+                    # Two-tailed: proportion where |difference| >= |observed_mean_diff|
+                    observed_abs_diff = abs(mean_diff)
+                    p_value = np.mean(np.abs(differences) >= observed_abs_diff)
+                    
+                    # Sign flips: proportion where difference has opposite sign from mean
+                    mean_sign = np.sign(mean_diff)
+                    if mean_sign != 0:
+                        flip_proportion = np.mean(np.sign(differences) != mean_sign)
+                    else:
+                        flip_proportion = 0.5  # If mean is exactly zero, half will be opposite
+                    
+                    group_differences[comparison][metric_name] = {
+                        'mean_diff': mean_diff,
+                        'ci_lower': ci_lower,
+                        'ci_upper': ci_upper,
+                        'p_value': p_value
+                    }
+                    sign_flips[comparison][metric_name] = flip_proportion
+    
+    return {
+        'bootstrap_distributions': bootstrap_distributions,
+        'group_means': group_means,
+        'group_cis': group_cis,
+        'group_differences': group_differences,
+        'sign_flips': sign_flips,
+        'n_bootstrap': n_bootstrap,
+        'confidence_level': confidence_level,
+        'metric_type': metric_type,
+        'region_type': region_type
+    }
+
+
+def plot_bootstrap_results(
+    bootstrap_results: Dict,
+    groups: Dict[str, List[str]],
+    connectome_type: str,
+    metric_names: Optional[List[str]] = None,
+    save_path: Optional[Union[str, Path]] = None,
+    figsize: Tuple[int, int] = (14, 10)
+) -> plt.Figure:
+    """
+    Create visualization of bootstrap results with confidence intervals.
+    
+    Parameters:
+    -----------
+    bootstrap_results : dict
+        Results from bootstrap_global_network_metrics()
+    groups : dict
+        Dictionary mapping group names to subject lists
+    connectome_type : str
+        Type of connectome (for title)
+    metric_names : list, optional
+        List of metric names to plot. If None, plots all metrics.
+    save_path : str or Path, optional
+        Path to save figure
+    figsize : tuple
+        Figure size (width, height)
+    
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        Figure object
+    """
+    group_means = bootstrap_results['group_means']
+    group_cis = bootstrap_results['group_cis']
+    metric_type = bootstrap_results.get('metric_type', 'metrics')
+    region_type = bootstrap_results.get('region_type', 'whole_brain')
+    
+    if metric_names is None:
+        metric_names = list(group_means.keys())
+    
+    # Filter to available metrics
+    metric_names = [m for m in metric_names if m in group_means]
+    
+    if len(metric_names) == 0:
+        raise ValueError("No valid metrics to plot")
+    
+    # Determine layout
+    n_metrics = len(metric_names)
+    n_cols = min(3, n_metrics)
+    n_rows = (n_metrics + n_cols - 1) // n_cols
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+    if n_metrics == 1:
+        axes = [axes]
+    else:
+        axes = axes.flatten()
+    
+    group_names = list(groups.keys())
+    color_list = get_group_colors(group_names)
+    colors = dict(zip(group_names, color_list))
+    
+    for idx, metric_name in enumerate(metric_names):
+        ax = axes[idx]
+        
+        # Prepare data for plotting
+        x_pos = np.arange(len(group_names))
+        means = [group_means[metric_name].get(g, np.nan) for g in group_names]
+        ci_lowers = [group_cis[metric_name].get(g, (np.nan, np.nan))[0] for g in group_names]
+        ci_uppers = [group_cis[metric_name].get(g, (np.nan, np.nan))[1] for g in group_names]
+        errors_lower = [m - cl for m, cl in zip(means, ci_lowers)]
+        errors_upper = [cu - m for m, cu in zip(means, ci_uppers)]
+        
+        # Plot bars with error bars
+        bars = ax.bar(x_pos, means, yerr=[errors_lower, errors_upper], 
+                     capsize=5, color=[colors.get(g, 'gray') for g in group_names],
+                     alpha=0.7, edgecolor='black', linewidth=1.5)
+        
+        # Add value labels on bars
+        for i, (bar, mean_val) in enumerate(zip(bars, means)):
+            if not np.isnan(mean_val):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{mean_val:.3f}',
+                       ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(group_names, rotation=45, ha='right')
+        ax.set_ylabel(metric_name.replace('_', ' ').title(), fontweight='bold')
+        ax.set_title(f'{metric_name.replace("_", " ").title()}\n(95% CI)', 
+                    fontweight='bold', fontsize=11)
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+    
+    # Hide extra subplots
+    for idx in range(n_metrics, len(axes)):
+        axes[idx].axis('off')
+    
+    # Main title
+    title = f'Bootstrap Results: {metric_type.replace("_", " ").title()} ({region_type.replace("_", " ").title()})\n{connectome_type}'
+    fig.suptitle(title, fontsize=14, fontweight='bold', y=0.995)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.98])
+    
+    if save_path:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"✓ Saved bootstrap figure to {save_path}")
+    
+    return fig
+
+
+def save_bootstrap_summary(
+    bootstrap_results: Dict,
+    save_path: Union[str, Path],
+    verbose: bool = True
+):
+    """
+    Save bootstrap results summary to CSV files.
+    
+    Parameters:
+    -----------
+    bootstrap_results : dict
+        Results from bootstrap_global_network_metrics()
+    save_path : str or Path
+        Base path for saving (will create multiple files)
+    verbose : bool
+        Whether to print save messages
+    """
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    group_means = bootstrap_results['group_means']
+    group_cis = bootstrap_results['group_cis']
+    group_differences = bootstrap_results['group_differences']
+    sign_flips = bootstrap_results['sign_flips']
+    
+    # 1. Group means and CIs
+    means_data = []
+    for metric_name, group_data in group_means.items():
+        for group_name, mean_val in group_data.items():
+            ci_lower, ci_upper = group_cis[metric_name][group_name]
+            means_data.append({
+                'metric': metric_name,
+                'group': group_name,
+                'mean': mean_val,
+                'ci_lower': ci_lower,
+                'ci_upper': ci_upper,
+                'ci_width': ci_upper - ci_lower
+            })
+    
+    means_df = pd.DataFrame(means_data)
+    means_path = save_path.parent / f"{save_path.stem}_group_means.csv"
+    means_df.to_csv(means_path, index=False)
+    if verbose:
+        print(f"✓ Saved group means to {means_path}")
+    
+    # 2. Group differences
+    diff_data = []
+    for comparison, metric_data in group_differences.items():
+        for metric_name, diff_info in metric_data.items():
+            diff_data.append({
+                'comparison': comparison,
+                'metric': metric_name,
+                'mean_difference': diff_info['mean_diff'],
+                'ci_lower': diff_info['ci_lower'],
+                'ci_upper': diff_info['ci_upper'],
+                'p_value': diff_info['p_value']
+            })
+    
+    if diff_data:
+        diff_df = pd.DataFrame(diff_data)
+        diff_path = save_path.parent / f"{save_path.stem}_group_differences.csv"
+        diff_df.to_csv(diff_path, index=False)
+        if verbose:
+            print(f"✓ Saved group differences to {diff_path}")
+    
+    # 3. Sign flips
+    flip_data = []
+    for comparison, metric_data in sign_flips.items():
+        for metric_name, flip_prop in metric_data.items():
+            flip_data.append({
+                'comparison': comparison,
+                'metric': metric_name,
+                'sign_flip_proportion': flip_prop
+            })
+    
+    if flip_data:
+        flip_df = pd.DataFrame(flip_data)
+        flip_path = save_path.parent / f"{save_path.stem}_sign_flips.csv"
+        flip_df.to_csv(flip_path, index=False)
+        if verbose:
+            print(f"✓ Saved sign flips to {flip_path}")
 
 
 # ============================================================================

@@ -48,6 +48,8 @@ normalized/
 _dcm2niix_tmp/
 _backup_*/
 
+SDI/spm 
+
 # Large atlas files (keep only small metadata files)
 atlas/*.nii.gz
 atlas/*.mif
@@ -57,6 +59,7 @@ atlas/mni_icbm152_nlin_asym_09c/
 atlas/new_template/
 atlas/registration_*/
 atlas/subcort_brainstem/
+atlas/*.mat
 atlas/Yeo_JNeurophysiol11_MNI152/
 
 # Results and outputs
@@ -70,10 +73,8 @@ Preproc_current/*.pdf
 logs/
 scripts/logs/
 
-# Third-party tools (keep only if you've modified them)
-# Uncomment if you want to exclude these:
-# dcm2niix/
-# SDI/
+dcm2niix/
+
 
 # Temporary files
 *.tmp
@@ -90,16 +91,23 @@ Thumbs.db
 .env
 .env.local
 
-# Large CSV files (connectomes)
+# Large CSV files (connectomes) - but keep small atlas/script CSVs
 *.csv
-!atlas/*.csv  # Keep atlas mapping CSVs
-!scripts/**/*.csv  # Keep small CSV files in scripts
+!atlas/
+atlas/*.csv
+!atlas/final_atlas_to_yeo7.csv
+!atlas/original_to_shifted_parcel_mapping.csv
+!scripts/
+!scripts/**/*.csv
 
 # Excel files (keep only if small)
 *.xlsx
-!atlas/parcels_label.xlsx  # Keep this one
+!atlas/
+!atlas/parcels_label.xlsx
 
 # Cache files
 .cache/
 *.cache
+
+SDI/GSP_StructuralDecouplingIndex/
 

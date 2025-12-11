@@ -53,6 +53,7 @@ from .connectome_utils import (
     plot_all_connectomes,
     plot_group_comparison_boxplot,
     plot_connectome_heatmap,
+    get_group_cmap,
     get_group_colors,
     
     # Statistical utilities
@@ -88,6 +89,11 @@ from .connectome_utils import (
     run_efficiency_statistical_tests,
     plot_efficiency_pathlength_results,
     run_full_efficiency_analysis,
+    
+    # Bootstrap analysis
+    bootstrap_global_network_metrics,
+    plot_bootstrap_results,
+    save_bootstrap_summary,
     
     # Connectome ordering and visualization
     build_cortical_order_LH_RH,
@@ -167,6 +173,11 @@ __all__ = [
     'run_efficiency_statistical_tests',
     'plot_efficiency_pathlength_results',
     'run_full_efficiency_analysis',
+    
+    # Bootstrap analysis
+    'bootstrap_global_network_metrics',
+    'plot_bootstrap_results',
+    'save_bootstrap_summary',
     
     # Connectome ordering and visualization
     'build_cortical_order_LH_RH',
