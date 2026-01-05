@@ -49,7 +49,7 @@ _dcm2niix_tmp/
 _backup_*/
 
 SDI/spm 
-
+github/
 # Large atlas files (keep only small metadata files)
 atlas/*.nii.gz
 atlas/*.mif

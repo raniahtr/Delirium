@@ -7,7 +7,7 @@ from nilearn import plotting
 
 
 # Inputs 
-HARM_PATH = "/media/RCPNAS/Data/Delirium/Delirium_Rania/SDI/data/harmonics.mat"
+HARM_PATH = "/media/RCPNAS/Data/Delirium/Delirium_Rania/SDI/data/harmonics_ICU_combined.mat"
 ATLAS_PATH = "/media/RCPNAS/Data/Delirium/Delirium_Rania/atlas/Final_Combined_atlas_MNI2009c_1mm.nii.gz"
 
 # Parcels removed from the connectomes (1-indexed labels)
@@ -76,7 +76,7 @@ def main():
 
     # Save connectome
     print("saving connectome")
-    out_png = "/media/RCPNAS/Data/Delirium/Delirium_Rania/SDI/data/harmonics_k3.png"
+    out_png = "/media/RCPNAS/Data/Delirium/Delirium_Rania/SDI/data/harmonics_combined_k3.png"
     display.savefig(out_png)
     display.close()  # free resources
     print(f"Saved to {out_png}")

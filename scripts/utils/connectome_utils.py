@@ -470,7 +470,6 @@ def load_all_connectomes(preproc_dir: Union[str, Path] = PREPROC_DIR,
         try:
             matrix = load_connectome(connectome_path)
             connectomes[sub_id] = matrix
-            print(f"✓ Loaded {sub_id}: shape {matrix.shape}")
         except Exception as e:
             print(f"✗ Failed to load {sub_id}: {e}")
             continue
@@ -1718,9 +1717,9 @@ def plot_sc_fingerprint_btw_subjects_by_group(
     
     fig, axes = plt.subplots(n_groups, n_regions, 
                             figsize=(4*n_regions, 4*n_groups),
-                            gridspec_kw={'left': 0.1, 'right': 0.98, 
-                                        'top': 0.93, 'bottom': 0.05,
-                                        'wspace': 0.3, 'hspace': 0.35})
+                            gridspec_kw={'left': 0.10, 'right': 0.98, 
+                                        'top': 0.92, 'bottom': 0.08,
+                                        'wspace': 0.55, 'hspace': 0.45})
     
     # Handle single row or column case
     if n_groups == 1:
@@ -1741,10 +1740,12 @@ def plot_sc_fingerprint_btw_subjects_by_group(
                 im = ax.imshow(matrix, cmap='coolwarm', vmin=vmin, vmax=vmax, aspect='equal', interpolation='nearest')
                 cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                 cbar.set_ticks(np.linspace(vmin, vmax, 6))
+                cbar.ax.tick_params(labelsize=13)
             elif scale == 'bygroup':
                 im = ax.imshow(matrix, cmap='coolwarm', vmin=vmins[j], vmax=vmaxs[j], aspect='equal', interpolation='nearest')
                 cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                 cbar.set_ticks(np.linspace(vmins[j], vmaxs[j], 6))
+                cbar.ax.tick_params(labelsize=13)
             else:  # auto
                 im = ax.imshow(matrix, cmap='coolwarm', aspect='equal', interpolation='nearest')
                 # For auto scale, get the actual data range from the matrix
@@ -1754,31 +1755,52 @@ def plot_sc_fingerprint_btw_subjects_by_group(
                     auto_vmax = np.percentile(valid_data, 95)
                     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                     cbar.set_ticks(np.linspace(auto_vmin, auto_vmax, 6))
+                    cbar.ax.tick_params(labelsize=13)
                 else:
                     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                     # If no valid data, just use default ticks
                     cbar.set_ticks(6)  # This will use MaxNLocator with 6 ticks
+                    cbar.ax.tick_params(labelsize=13)
 
             ax.grid(False)
 
             # Build title with region name and SD
             # Only show region name on top row (j == 0)
             if j == 0:  # Top row: show region name (network name)
-                title_parts = [region_labels[i]]  # Use the mapped network name
+                # Use line breaks for long region names to prevent overlap
+                region_label = region_labels[i]
+                # Add line break for attention networks
+                if 'Attention' in region_label:
+                    if 'Dorsal' in region_label:
+                        region_label = 'Dorsal\nAttention'
+                    elif 'Ventral' in region_label:
+                        region_label = 'Ventral\nAttention'
+                
+                # Format: region name in bold, SD in normal weight (matching other rows)
                 if add_sd:
                     std_val = np.nanstd(matrix)
-                    title_parts.append(f'SD: {std_val:.3f}')
-                ax.set_title(' | '.join(title_parts), fontsize=11, fontweight='bold', pad=10)
+                    # Use invisible title for spacing only
+                    ax.set_title(' ', fontsize=20, pad=7, alpha=0)
+                    # Add region name in bold, centered
+                    ax.text(0.5, 1.0 + 18/72, region_label, 
+                           transform=ax.transAxes, ha='center', va='bottom',
+                           fontsize=25, fontweight='bold', zorder=10)
+                    # Add SD text below the region name
+                    ax.text(0.5, 1.0 + 18/72 - 0.15, f'SD: {std_val:.3f}', 
+                           transform=ax.transAxes, ha='center', va='bottom',
+                           fontsize=20, fontweight='normal', zorder=10)
+                else:
+                    ax.set_title(region_label, fontsize=20, fontweight='bold', pad=18)
             elif add_sd:  # Other rows: only show SD if requested
                 std_val = np.nanstd(matrix)
-                ax.set_title(f'SD: {std_val:.3f}', fontsize=10, pad=10)
+                ax.set_title(f'SD: {std_val:.3f}', fontsize=20, pad=15)
             
             # Set labels and tick marks
             n_subjects = matrix.shape[0]
             if j == n_groups - 1:  # Only label x-axis on bottom row
-                ax.set_xlabel('Subjects', fontsize=10)
+                ax.set_xlabel('Subjects', fontsize=20, fontweight='bold')
             if i == 0:  # Only label y-axis on left column
-                ax.set_ylabel('Subjects', fontsize=10, fontweight='bold')
+                ax.set_ylabel('Subjects', fontsize=20, fontweight='bold')
 
             ax.set_xticks([0, n_subjects-1])
             ax.set_yticks([0, n_subjects-1])
@@ -1795,9 +1817,9 @@ def plot_sc_fingerprint_btw_subjects_by_group(
                 tick_labels = [str(i) for i in tick_positions]
             
             ax.set_xticks(tick_positions)
-            ax.set_xticklabels(tick_labels, fontsize=8)
+            ax.set_xticklabels(tick_labels, fontsize=13)
             ax.set_yticks(tick_positions)
-            ax.set_yticklabels(tick_labels, fontsize=8)
+            ax.set_yticklabels(tick_labels, fontsize=13)
     
     # Add row labels (group names) on the left side using figure coordinates
     # This ensures proper alignment with rows regardless of subplot positions
@@ -1808,18 +1830,428 @@ def plot_sc_fingerprint_btw_subjects_by_group(
         # Center y position of the row (in figure coordinates)
         y_center = bbox.y0 + bbox.height / 2
         # Place text to the left, using figure coordinates for proper alignment
-        fig.text(0.06, y_center, group_name, transform=fig.transFigure,
-                rotation=90, ha='center', va='center', fontsize=14, 
+        fig.text(0.07, y_center, group_name, transform=fig.transFigure,
+                rotation=90, ha='center', va='center', fontsize=29, 
                 fontweight='bold', color=group_colors[j])
     
-    # Main title
-    fig.suptitle(f'Subject × Subject Similarity Matrices (Pearson r) of Structural Connectivity ({connectome_type})',
-                fontsize=16, fontweight='bold', y=0.98)
     
     fig.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close(fig)
+    # plt.close(fig)
     
     print(f" Saved figure to {save_path}")
+    
+    return fig
+
+
+def compute_sdi_similarity_between_subjects(
+    unified_sdi_df: pd.DataFrame,
+    groups: Optional[Dict[str, List[str]]] = None,
+    overwrite: bool = False,
+    save_path: Optional[Path] = None
+) -> pd.DataFrame:
+    """
+    Compute Pearson correlation between subjects' SDI values for each region category.
+    
+    Similar to compute_sc_similarity_between_subjects but for SDI data.
+    Groups by region category (Yeo7 networks, subcortical, brainstem, cerebellum).
+    Uses standardized group names: "ICU", "ICU Delirium", "Healthy Controls".
+    
+    Parameters:
+    -----------
+    unified_sdi_df : pd.DataFrame
+        DataFrame with columns: 'subject_id', 'parcel_id', 'sdi_value', 'group'
+        This is the output from load_sdi_hc_icu_data or similar SDI loading functions
+    groups : dict, optional
+        Dictionary mapping group names to subject ID lists.
+        If None, will infer from unified_sdi_df['group'] column
+    overwrite : bool
+        If False and save_path exists, load from file instead of recomputing
+    save_path : Path, optional
+        Path to save results (HDF5 or CSV). If None, saves to current directory
+    
+    Returns:
+    --------
+    similarity_df : pd.DataFrame
+        DataFrame with columns: 'Group', 'Region Category', 'Subject i', 'Subject j', 'Similarity'
+    """
+    # Load atlas to Yeo7 mapping
+    atlas_to_yeo7_df = pd.read_csv(ATLAS_TO_YEO7_CSV)
+    
+    # Infer groups from DataFrame if not provided
+    if groups is None:
+        groups = {}
+        for group_name in unified_sdi_df['group'].unique():
+            group_subjects = unified_sdi_df[unified_sdi_df['group'] == group_name]['subject_id'].unique()
+            # Convert to list and ensure consistent format (with 'sub-' prefix if needed)
+            subject_list = []
+            for subj_id in group_subjects:
+                # Ensure subject ID has 'sub-' prefix
+                if not subj_id.startswith('sub-'):
+                    subject_list.append(f"sub-{subj_id}")
+                else:
+                    subject_list.append(subj_id)
+            groups[group_name] = subject_list
+    
+    # Define region categories
+    region_categories = [f'Yeo7_Network_{i}' for i in range(1, 8)] + ['Subcortical', 'Brainstem', 'Cerebellum']
+    
+    # Set default save path
+    if save_path is None:
+        save_path = Path.cwd() / 'sdi_similarity_matrices.h5'
+    
+    # Check if file exists and should be loaded
+    if save_path.exists() and not overwrite:
+        print(f"Loading existing similarity matrices from {save_path}")
+        if save_path.suffix == '.h5':
+            return pd.read_hdf(save_path, key='similarity_matrices')
+        else:
+            return pd.read_csv(save_path)
+    
+    print("Computing similarity matrices between subjects for SDI values...")
+    
+    # Add region category to DataFrame
+    unified_sdi_df = unified_sdi_df.copy()
+    # get_region_category_indices expects 1-indexed parcel IDs
+    # Check if parcel_id is 0-indexed or 1-indexed by looking at the data
+    sample_parcel_id = unified_sdi_df['parcel_id'].iloc[0]
+    if sample_parcel_id == 0:
+        # 0-indexed, convert to 1-indexed for the function
+        unified_sdi_df['region_category'] = unified_sdi_df['parcel_id'].apply(
+            lambda pid: get_region_category_indices(pid + 1, atlas_to_yeo7_df)
+        )
+    else:
+        # Already 1-indexed
+        unified_sdi_df['region_category'] = unified_sdi_df['parcel_id'].apply(
+            lambda pid: get_region_category_indices(pid, atlas_to_yeo7_df)
+        )
+    # Filter out rows where region_category is None
+    unified_sdi_df = unified_sdi_df.dropna(subset=['region_category'])
+    
+    results_rows = []
+    
+    # Process by group and region category
+    for group_name, subject_list in groups.items():
+        print(f"\nProcessing group: {group_name}")
+        
+        # Filter subjects that are in the SDI data
+        subjects_in_data = []
+        for subj_id in subject_list:
+            # Try both with and without 'sub-' prefix
+            subj_variants = [subj_id, subj_id.replace('sub-', ''), f"sub-{subj_id.replace('sub-', '')}"]
+            for variant in subj_variants:
+                if variant in unified_sdi_df['subject_id'].values:
+                    subjects_in_data.append(variant)
+                    break
+        
+        if len(subjects_in_data) < 2:
+            print(f"  Skipping {group_name}: need at least 2 subjects with SDI data")
+            continue
+        
+        print(f"  Found {len(subjects_in_data)} subjects with SDI data")
+        
+        # Extract SDI vectors for each subject and region category
+        region_vectors = {}
+        for region_cat in region_categories:
+            region_vectors[region_cat] = {}
+            # Filter data for this group and region
+            region_data = unified_sdi_df[
+                (unified_sdi_df['group'] == group_name) & 
+                (unified_sdi_df['region_category'] == region_cat)
+            ]
+            
+            for subj in subjects_in_data:
+                # Get SDI values for this subject and region
+                subj_region_data = region_data[region_data['subject_id'] == subj]
+                if len(subj_region_data) > 0:
+                    # Sort by parcel_id to ensure consistent ordering
+                    subj_region_data = subj_region_data.sort_values('parcel_id')
+                    sdi_values = subj_region_data['sdi_value'].values
+                    # Remove NaN and Inf values
+                    valid_mask = np.isfinite(sdi_values)
+                    if np.sum(valid_mask) > 0:
+                        region_vectors[region_cat][subj] = sdi_values[valid_mask]
+        
+        # Compute pairwise similarities
+        for region_cat in region_categories:
+            if len(region_vectors[region_cat]) < 2:
+                continue
+            
+            subjects_in_region = list(region_vectors[region_cat].keys())
+            
+            for subj_i, subj_j in combinations(subjects_in_region, 2):
+                vec_i = region_vectors[region_cat][subj_i]
+                vec_j = region_vectors[region_cat][subj_j]
+                
+                # Compute Pearson correlation
+                if len(vec_i) == len(vec_j) and len(vec_i) > 1:
+                    # Remove any NaN or Inf values (should already be done, but double-check)
+                    mask = np.isfinite(vec_i) & np.isfinite(vec_j)
+                    if np.sum(mask) > 1:
+                        similarity = np.corrcoef(vec_i[mask], vec_j[mask])[0, 1]
+                        if np.isfinite(similarity):
+                            results_rows.append({
+                                'Group': group_name,
+                                'Region Category': region_cat,
+                                'Subject i': subj_i,
+                                'Subject j': subj_j,
+                                'Similarity': similarity
+                            })
+    
+    similarity_df = pd.DataFrame(results_rows)
+    
+    # Save results
+    if save_path.suffix == '.h5':
+        similarity_df.to_hdf(save_path, key='similarity_matrices', mode='w')
+    else:
+        similarity_df.to_csv(save_path, index=False)
+    
+    print(f"\n✓ Saved similarity matrices to {save_path}")
+    print(f"  Total pairs: {len(similarity_df)}")
+    
+    return similarity_df
+
+
+def plot_sdi_fingerprint_btw_subjects_by_group(
+    similarity_df: pd.DataFrame,
+    groups: Dict[str, List[str]],
+    region_categories: List[str],
+    save_path: Path,
+    scale: str = 'bygroup',
+    add_sd: bool = True
+):
+    """
+    Plot subject × subject similarity matrices for SDI values.
+    
+    Layout: Groups as rows, region categories as columns.
+    Uses get_group_colors() for consistent coloring.
+    Includes SD values in titles if add_sd=True.
+    Uses 'coolwarm' colormap like structural connectome version.
+    
+    Parameters:
+    -----------
+    similarity_df : pd.DataFrame
+        DataFrame with similarity values (from compute_sdi_similarity_between_subjects)
+    groups : dict
+        Dictionary mapping group names to subject ID lists
+    region_categories : list
+        List of region category names to plot
+    save_path : Path
+        Path to save the figure
+    scale : str
+        Color scale option: 'bygroup', 'same', or 'auto' (default: 'bygroup')
+    add_sd : bool
+        If True, add standard deviation to subplot titles (default: True)
+    """
+    # Yeo7 network name mapping (define early)
+    yeo7_network_names = {
+        1: 'Visual',
+        2: 'Somatomotor',
+        3: 'Dorsal Attention',
+        4: 'Ventral Attention',
+        5: 'Limbic',
+        6: 'Frontoparietal',
+        7: 'Default Mode'
+    }
+    
+    # Prepare region labels with actual Yeo7 network names
+    region_labels = []
+    for region_cat in region_categories:
+        if region_cat.startswith('Yeo7_Network_'):
+            # Extract network number from 'Yeo7_Network_1', 'Yeo7_Network_2', etc.
+            network_num = int(region_cat.split('_')[-1])
+            network_name = yeo7_network_names.get(network_num, f'Network {network_num}')
+            region_labels.append(network_name)
+        else:
+            # For non-Yeo7 regions (Subcortical, Brainstem, Cerebellum), use as-is
+            region_labels.append(region_cat)
+    
+    n_groups = len(groups)
+    n_regions = len(region_categories)
+    
+    # Recover matrices for each group and region category
+    similarity_matrices_bygroup = {}
+    subject_lists_bygroup = {}  # Store sorted subject lists for labeling
+    for group_name in groups.keys():
+        similarity_matrices_bygroup[group_name] = {}
+        # Get full subject IDs for this group and sort them
+        subject_list = sorted([subj if subj.startswith('sub-') else f"sub-{subj}" 
+                              for subj in groups[group_name]])
+        subject_lists_bygroup[group_name] = subject_list
+        
+        for region_cat in region_categories:
+            matrix = recover_sc_similarity_matrix(similarity_df, group_name, region_cat, subject_list)
+            # Validation: Check matrix dimensions match subject count
+            if matrix.shape[0] != len(subject_list):
+                raise ValueError(f"Matrix dimension mismatch for {group_name}/{region_cat}: "
+                               f"matrix shape {matrix.shape[0]} != subject count {len(subject_list)}")
+            # Warn if matrix is all zeros (no data for this region)
+            valid_values = matrix[~np.isnan(matrix)]
+            if len(valid_values) > 0 and np.all(valid_values == 0):
+                warnings.warn(f"No similarity data found for {group_name}/{region_cat}. "
+                            f"Matrix will be plotted as all zeros. This may occur for regions "
+                            f"with insufficient connectivity data (e.g., Cerebellum with only 2 parcels).")
+            similarity_matrices_bygroup[group_name][region_cat] = matrix
+    
+    # Compute color scale limits
+    if scale == 'bygroup':
+        vmins = []
+        vmaxs = []
+        for group_name in groups.keys():
+            all_values = []
+            for region_cat in region_categories:
+                matrix = similarity_matrices_bygroup[group_name][region_cat]
+                valid_values = matrix[~np.isnan(matrix)]
+                # Skip all-zero matrices (regions with no data)
+                if len(valid_values) > 0 and np.any(valid_values != 0):
+                    all_values.extend(valid_values)
+            if len(all_values) > 0:
+                vmin = np.percentile(all_values, 5)
+                vmax = np.percentile(all_values, 95)
+            else:
+                vmin, vmax = -1, 1
+            vmins.append(vmin)
+            vmaxs.append(vmax)
+    elif scale == 'same':
+        all_values = []
+        for group_name in groups.keys():
+            for region_cat in region_categories:
+                matrix = similarity_matrices_bygroup[group_name][region_cat]
+                valid_values = matrix[~np.isnan(matrix)]
+                # Skip all-zero matrices (regions with no data)
+                if len(valid_values) > 0 and np.any(valid_values != 0):
+                    all_values.extend(valid_values)
+        if len(all_values) > 0:
+            vmin = np.percentile(all_values, 5)
+            vmax = np.percentile(all_values, 95)
+        else:
+            vmin, vmax = -1, 1
+    
+    fig, axes = plt.subplots(n_groups, n_regions, 
+                            figsize=(4*n_regions, 4*n_groups),
+                            gridspec_kw={'left': 0.10, 'right': 0.98, 
+                                        'top': 0.92, 'bottom': 0.08,
+                                        'wspace': 0.55, 'hspace': 0.45})
+    
+    # Handle single row or column case
+    if n_groups == 1:
+        axes = axes.reshape(1, -1)
+    if n_regions == 1:
+        axes = axes.reshape(-1, 1)
+    
+    # Get group colors 
+    group_colors = get_group_colors(groups.keys())
+    
+    # Plot matrices
+    for j, group_name in enumerate(groups.keys()):
+        for i, region_cat in enumerate(region_categories):
+            ax = axes[j, i]
+            matrix = similarity_matrices_bygroup[group_name][region_cat]
+            
+            if scale == 'same':
+                im = ax.imshow(matrix, cmap='coolwarm', vmin=vmin, vmax=vmax, aspect='equal', interpolation='nearest')
+                cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                cbar.set_ticks(np.linspace(vmin, vmax, 6))
+                cbar.ax.tick_params(labelsize=13)
+            elif scale == 'bygroup':
+                im = ax.imshow(matrix, cmap='coolwarm', vmin=vmins[j], vmax=vmaxs[j], aspect='equal', interpolation='nearest')
+                cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                cbar.set_ticks(np.linspace(vmins[j], vmaxs[j], 6))
+                cbar.ax.tick_params(labelsize=13)
+            else:  # auto
+                im = ax.imshow(matrix, cmap='coolwarm', aspect='equal', interpolation='nearest')
+                # For auto scale, get the actual data range from the matrix
+                valid_data = matrix[~np.isnan(matrix)]
+                if len(valid_data) > 0:
+                    auto_vmin = np.percentile(valid_data, 5)
+                    auto_vmax = np.percentile(valid_data, 95)
+                    cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                    cbar.set_ticks(np.linspace(auto_vmin, auto_vmax, 6))
+                    cbar.ax.tick_params(labelsize=13)
+                else:
+                    cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                    # If no valid data, just use default ticks
+                    cbar.set_ticks(6)  # This will use MaxNLocator with 6 ticks
+                    cbar.ax.tick_params(labelsize=13)
+
+            ax.grid(False)
+
+            # Build title with region name and SD
+            # Only show region name on top row (j == 0)
+            if j == 0:  # Top row: show region name (network name)
+                # Use line breaks for long region names to prevent overlap
+                region_label = region_labels[i]
+                # Add line break for attention networks
+                if 'Attention' in region_label:
+                    if 'Dorsal' in region_label:
+                        region_label = 'Dorsal\nAttention'
+                    elif 'Ventral' in region_label:
+                        region_label = 'Ventral\nAttention'
+                
+                # Format: region name in bold, SD in normal weight (matching other rows)
+                if add_sd:
+                    std_val = np.nanstd(matrix)
+                    # Use invisible title for spacing only
+                    ax.set_title(' ', fontsize=20, pad=7, alpha=0)
+                    # Add region name in bold, centered
+                    ax.text(0.5, 1.0 + 18/72, region_label, 
+                           transform=ax.transAxes, ha='center', va='bottom',
+                           fontsize=25, fontweight='bold', zorder=10)
+                    # Add SD text below the region name
+                    ax.text(0.5, 1.0 + 18/72 - 0.15, f'SD: {std_val:.3f}', 
+                           transform=ax.transAxes, ha='center', va='bottom',
+                           fontsize=20, fontweight='normal', zorder=10)
+                else:
+                    ax.set_title(region_label, fontsize=20, fontweight='bold', pad=18)
+            elif add_sd:  # Other rows: only show SD if requested
+                std_val = np.nanstd(matrix)
+                ax.set_title(f'SD: {std_val:.3f}', fontsize=20, pad=15)
+            
+            # Set labels and tick marks
+            n_subjects = matrix.shape[0]
+            if j == n_groups - 1:  # Only label x-axis on bottom row
+                ax.set_xlabel('Subjects', fontsize=20, fontweight='bold')
+            if i == 0:  # Only label y-axis on left column
+                ax.set_ylabel('Subjects', fontsize=20, fontweight='bold')
+
+            ax.set_xticks([0, n_subjects-1])
+            ax.set_yticks([0, n_subjects-1])
+                        
+            # Set tick positions to match matrix indices (0, 1, 2, ...)
+            if n_subjects <= 10:
+                tick_positions = list(range(n_subjects))
+                tick_labels = [str(i) for i in range(n_subjects)]
+            else:
+                step = max(1, n_subjects // 5)
+                tick_positions = list(range(0, n_subjects, step))
+                if tick_positions[-1] != n_subjects - 1:
+                    tick_positions.append(n_subjects - 1)
+                tick_labels = [str(i) for i in tick_positions]
+            
+            ax.set_xticks(tick_positions)
+            ax.set_xticklabels(tick_labels, fontsize=13)
+            ax.set_yticks(tick_positions)
+            ax.set_yticklabels(tick_labels, fontsize=13)
+    
+    # Add row labels (group names) on the left side using figure coordinates
+    # This ensures proper alignment with rows regardless of subplot positions
+    for j, group_name in enumerate(groups.keys()):
+        # Get the leftmost axis in this row to determine position
+        ax_ref = axes[j, 0]
+        bbox = ax_ref.get_position()
+        # Center y position of the row (in figure coordinates)
+        y_center = bbox.y0 + bbox.height / 2
+        # Place text to the left, using figure coordinates for proper alignment
+        fig.text(0.07, y_center, group_name, transform=fig.transFigure,
+                rotation=90, ha='center', va='center', fontsize=29, 
+                fontweight='bold', color=group_colors[j])
+    
+    
+    fig.savefig(save_path, dpi=300, bbox_inches='tight')
+    # plt.close(fig)
+    
+    print(f" Saved figure to {save_path}")
+    
+    return fig
 
 
 def compute_sc_similarity_all_subjects_by_region(
@@ -4371,22 +4803,53 @@ def build_combined_order_cortical_subcortical(
     # Get cortical ordering
     cort_order, cort_breaks, cort_labels = build_cortical_order_LH_RH(M, A7, yeo7_names)
     
-    # Get subcortical ordering
+    # Get subcortical ordering (parcels 361-424, excluding 390 and 423 = 62 parcels)
+    # The subcortical order returns 0-61 indices that correspond to positions in the extracted subcortical matrix
+    # We need to map these back to the full 430×430 matrix indices
     subcort_order, subcort_breaks, subcort_labels = build_subcortical_order_by_category(M, parcel_to_category)
     
-    # Combine: cortical first (0-359), then subcortical (360-423)
-    # For subcortical, we need to map from 0-63 to 360-423
-    subcort_order_full = subcort_order + 360
+    # Create mapping from subcortical matrix position (0-61) to full matrix index (360-423)
+    # Parcels 361-424 excluding 390 and 423
+    subcort_pos_to_full_idx = {}
+    pos = 0
+    for parcel_id in range(361, 425):  # 361-424 (1-indexed)
+        if parcel_id not in [390, 423]:  # Skip excluded parcels
+            full_idx = parcel_id - 1  # Convert to 0-indexed: 360-423
+            subcort_pos_to_full_idx[pos] = full_idx
+            pos += 1
     
-    order = np.concatenate([cort_order, subcort_order_full])
+    # Map subcortical order (0-61) to full matrix indices (360-423, excluding 389 and 422)
+    subcort_order_full = np.array([subcort_pos_to_full_idx[p] for p in subcort_order])
+    
+    # Add the excluded parcels 390 and 423 (indices 389 and 422) back
+    # These are in the full matrix but excluded from subcortical ordering
+    excluded_parcels = np.array([389, 422])  # 0-indexed: parcels 390 and 423
+    
+    # Add brainstem parcels (425-428) = indices 424-427
+    brainstem_order = np.array([424, 425, 426, 427])  # 0-indexed: parcels 425-428
+    
+    # Add cerebellum parcels (429-430) = indices 428-429
+    cerebellum_order = np.array([428, 429])  # 0-indexed: parcels 429-430
+    
+    # Combine: cortical (0-359), subcortical (mapped), excluded parcels, brainstem (424-427), cerebellum (428-429)
+    order = np.concatenate([cort_order, subcort_order_full, excluded_parcels, brainstem_order, cerebellum_order])
     
     # Combine breaks and labels
-    breaks = np.concatenate([cort_breaks, subcort_breaks + 360])
-    block_labels = cort_labels + subcort_labels
+    # Adjust breaks: subcortical breaks need to be mapped to full indices
+    excluded_break = len(cort_order) + len(subcort_order_full)  # After cortical + subcortical
+    brainstem_break = excluded_break + len(excluded_parcels)  # After excluded parcels
+    cerebellum_break = brainstem_break + len(brainstem_order)  # After brainstem
+    
+    breaks = np.concatenate([
+        cort_breaks, 
+        subcort_breaks + len(cort_order),  # Adjust relative to cortical length
+        np.array([excluded_break, brainstem_break, cerebellum_break])
+    ])
+    block_labels = cort_labels + subcort_labels + ['Excluded', 'Brainstem', 'Cerebellum']
     
     # Validate
-    assert len(order) == 430 and len(set(order)) == 430
-    assert order.min() == 0 and order.max() == 429
+    assert len(order) == 430 and len(set(order)) == 430, f"Expected 430 unique parcels, got {len(order)} total, {len(set(order))} unique. Missing: {set(range(430)) - set(order)}"
+    assert order.min() == 0 and order.max() == 429, f"Order indices out of range: min={order.min()}, max={order.max()}, expected 0-429"
     
     return order, breaks, block_labels
 

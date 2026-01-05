@@ -355,7 +355,7 @@ def main():
         epilog="""
 Examples:
   # Single subject
-  python snr_voxelwise_qc.py --sub_dir Preproc_current/sub-AD --sub_id sub-AD --out_dir qc_snr/
+  python snr_voxelwise_qc.py --sub_dir Preproc_current/sub-PMA --sub_id sub-PMA --out_dir qc_snr/
 
   # With custom paths
   python snr_voxelwise_qc.py \\
