@@ -48,7 +48,7 @@ normalized/
 _dcm2niix_tmp/
 _backup_*/
 
-SDI/spm 
+SDI/spm/ 
 github/
 # Large atlas files (keep only small metadata files)
 atlas/*.nii.gz
@@ -114,3 +114,6 @@ test_dcm2niix/
 normalized:
 preprocessing_log.txt
 .jupyter
+
+
+SDI_data_old/
