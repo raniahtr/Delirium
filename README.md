@@ -20,9 +20,10 @@ This repository contains analysis scripts and utilities for processing and analy
 ├── SDI/                # Structural Decoupling Index analysis
 │   ├── data/          # Data for Structural Decoupling Index analysis
 │   ├── GSP_StructuralDecouplingIndex/ # Code for Structural Decoupling Index analysis (from paper)
-│   └── spm/           # SPM software
-├── Preproc_current/    # Preprocessed data (not in git - too large)
-└── rawdata_current/    # Raw data (not in git - too large)
+│   └── spm/           # SPM software (not pushed to github)
+│   └── results/       # Results from SDI analysis 
+├── Preproc_current/    # Preprocessed data (not in git : too large)
+└── rawdata_current/    # Raw data (not in git : too large)
 ```
 
 ## Setup
